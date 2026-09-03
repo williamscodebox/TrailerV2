@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
@@ -6,7 +7,6 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
-import Ionicons from "react-native-vector-icons/Ionicons";
 import { useTrailerController } from "../hooks/useTrailerController";
 
 type ControlButtonProps = {
@@ -35,23 +35,37 @@ export default function TrailerController() {
 
   const blink = useSharedValue(1);
 
+  // Run blink animation once, forever
   useEffect(() => {
-    const blinking =
+    blink.value = withRepeat(withTiming(0, { duration: 300 }), -1, true);
+  }, []);
+
+  const blinkStyle = useAnimatedStyle(() => {
+    const shouldBlink =
       trailerState === "LEFT" ||
       trailerState === "RIGHT" ||
       trailerState === "BOTH" ||
-      trailerState === "HAZARDS" ||
-      trailerState === "BRAKE_LEFT" ||
-      trailerState === "BRAKE_RIGHT";
+      trailerState === "HAZARDS";
 
-    blink.value = blinking
-      ? withRepeat(withTiming(0, { duration: 300 }), -1, true)
-      : 1;
-  }, [trailerState]);
+    return {
+      opacity: shouldBlink ? blink.value : 1,
+    };
+  });
 
-  const blinkStyle = useAnimatedStyle(() => ({
-    opacity: blink.value,
-  }));
+  function getLightColor(side: "left" | "right", state: string) {
+    const isLeft = side === "left";
+    const isRight = side === "right";
+
+    if (state === "HAZARDS") return "#FACC15";
+    if (state === "BRAKE") return "#EF4444";
+    if (state === "BRAKE_LEFT" && isLeft) return "#EF4444";
+    if (state === "BRAKE_RIGHT" && isRight) return "#EF4444";
+    if (state === "LEFT" && isLeft) return "#6366F1";
+    if (state === "RIGHT" && isRight) return "#6366F1";
+    if (state === "BOTH") return "#6366F1";
+
+    return "#D1D5DB";
+  }
 
   return (
     <View style={styles.container}>
@@ -109,18 +123,7 @@ export default function TrailerController() {
               style={[
                 styles.light,
                 blinkStyle,
-                {
-                  backgroundColor:
-                    trailerState === "HAZARDS"
-                      ? "#FACC15"
-                      : trailerState === "BRAKE"
-                      ? "#EF4444"
-                      : trailerState === "BRAKE_LEFT"
-                      ? "#EF4444"
-                      : trailerState === "LEFT" || trailerState === "BOTH"
-                      ? "#6366F1"
-                      : "#D1D5DB",
-                },
+                { backgroundColor: getLightColor("left", trailerState) },
               ]}
             />
 
@@ -128,18 +131,7 @@ export default function TrailerController() {
               style={[
                 styles.light,
                 blinkStyle,
-                {
-                  backgroundColor:
-                    trailerState === "HAZARDS"
-                      ? "#FACC15"
-                      : trailerState === "BRAKE"
-                      ? "#EF4444"
-                      : trailerState === "BRAKE_RIGHT"
-                      ? "#EF4444"
-                      : trailerState === "RIGHT" || trailerState === "BOTH"
-                      ? "#6366F1"
-                      : "#D1D5DB",
-                },
+                { backgroundColor: getLightColor("right", trailerState) },
               ]}
             />
           </View>
