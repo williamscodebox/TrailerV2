@@ -125,34 +125,38 @@ class BLEController {
   // -----------------------------
   // Write queue
   // -----------------------------
-  async write(cmd: string) {
-    if (!this.device || !this.txChar) {
-      console.log("BLE not ready");
-      this.setStatus("disconnected");
-      return;
-    }
-
-    this.queue.push(cmd);
-    this.processQueue();
+async write(cmd: string) {
+  if (!this.device || !this.txChar) {
+    console.log("BLE not ready");
+    this.setStatus("disconnected");
+    return;
   }
 
-  private async processQueue() {
-    if (this.writing || !this.txChar) return;
-    this.writing = true;
+  // Convert ONE ASCII character into base64
+  const base64 = Buffer.from(cmd[0], "ascii").toString("base64");
 
-    try {
-      while (this.queue.length > 0) {
-        const cmd = this.queue.shift()!;
-        await this.txChar.writeWithoutResponse(cmd);
-        console.log("Sent:", cmd);
-      }
-    } catch (e) {
-      console.log("Write error:", e);
-      this.setStatus("disconnected");
-    } finally {
-      this.writing = false;
+  this.queue.push(base64);
+  this.processQueue();
+}
+
+private async processQueue() {
+  if (this.writing || !this.txChar) return;
+  this.writing = true;
+
+  try {
+    while (this.queue.length > 0) {
+      const base64 = this.queue.shift()!;
+      await this.txChar.writeWithoutResponse(base64);
+      console.log("Sent:", Buffer.from(base64, "base64").toString("ascii"));
     }
+  } catch (e) {
+    console.log("Write error:", e);
+    this.setStatus("disconnected");
+  } finally {
+    this.writing = false;
   }
+}
+
 
   // -----------------------------
   // Auto reconnect
