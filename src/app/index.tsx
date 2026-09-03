@@ -1,6 +1,4 @@
-import Ionicons from 'react-native-vector-icons/Ionicons';
-
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -8,7 +6,8 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
-import { BLE } from "../BLE";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import { useTrailerController } from "../hooks/useTrailerController";
 
 type ControlButtonProps = {
   label: string;
@@ -17,39 +16,25 @@ type ControlButtonProps = {
   onPress: () => void;
 };
 
-type TrailerCommand = "L" | "R" | "H" | "B" | "O";
-
 export default function TrailerController() {
-  const [left, setLeft] = useState(false);
-  const [right, setRight] = useState(false);
-  const [hazards, setHazards] = useState(false);
-  const [brake, setBrake] = useState(false);
-
-  const [connectionStatus, setConnectionStatus] = useState<
-    "idle" | "scanning" | "connecting" | "connected" | "disconnected"
-  >("idle");
-
-  const [trailerState, setTrailerState] = useState("OFF");
-
-  // ⭐ NEW: list of found BLE devices
-  const [devices, setDevices] = useState<any[]>([]);
+  const {
+    left,
+    right,
+    hazards,
+    brake,
+    trailerState,
+    connectionStatus,
+    devices,
+    startScan,
+    connectToDevice,
+    toggleLeft,
+    toggleRight,
+    toggleHazards,
+    toggleBrake,
+  } = useTrailerController();
 
   const blink = useSharedValue(1);
 
-  // BLE event handlers
-  useEffect(() => {
-    BLE.onTrailerState = (state) => setTrailerState(state);
-    BLE.onStatusChange = (status) => setConnectionStatus(status as any);
-
-    BLE.onDeviceFound = (device) => {
-      setDevices((prev) => {
-        if (prev.find((d) => d.id === device.id)) return prev;
-        return [...prev, device];
-      });
-    };
-  }, []);
-
-  // Blink animation
   useEffect(() => {
     const blinking =
       trailerState === "LEFT" ||
@@ -68,47 +53,10 @@ export default function TrailerController() {
     opacity: blink.value,
   }));
 
-  // ⭐ NEW: Start scanning
-  const startScan = () => {
-    setDevices([]);
-    BLE.startScan();
-  };
-
-  // ⭐ NEW: Connect to selected device
-  const connectToDevice = async (deviceId: string) => {
-    BLE.stopScan();
-    await BLE.connect(deviceId);
-  };
-
-  const sendCommand = async (cmd: TrailerCommand) => {
-    await BLE.write(cmd);
-  };
-
-  const toggleLeft = () => {
-    setLeft(!left);
-    sendCommand("L");
-  };
-
-  const toggleRight = () => {
-    setRight(!right);
-    sendCommand("R");
-  };
-
-  const toggleHazards = () => {
-    setHazards(!hazards);
-    sendCommand("H");
-  };
-
-  const toggleBrake = () => {
-    setBrake(!brake);
-    sendCommand("B");
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Trailer Controller</Text>
 
-      {/* STATUS BAR */}
       <View
         style={[
           styles.statusBar,
@@ -133,7 +81,6 @@ export default function TrailerController() {
         </Text>
       </View>
 
-      {/* ⭐ DEVICE SCAN + LIST */}
       {connectionStatus !== "connected" && (
         <View style={{ width: "100%", marginBottom: 20 }}>
           <TouchableOpacity style={styles.scanButton} onPress={startScan}>
@@ -155,7 +102,6 @@ export default function TrailerController() {
         </View>
       )}
 
-      {/* TRAILER DIAGRAM */}
       {connectionStatus === "connected" && (
         <>
           <View style={styles.trailerRow}>
@@ -171,7 +117,7 @@ export default function TrailerController() {
                       ? "#EF4444"
                       : trailerState === "BRAKE_LEFT"
                       ? "#EF4444"
-                      : trailerState === "LEFT"
+                      : trailerState === "LEFT" || trailerState === "BOTH"
                       ? "#6366F1"
                       : "#D1D5DB",
                 },
@@ -190,7 +136,7 @@ export default function TrailerController() {
                       ? "#EF4444"
                       : trailerState === "BRAKE_RIGHT"
                       ? "#EF4444"
-                      : trailerState === "RIGHT"
+                      : trailerState === "RIGHT" || trailerState === "BOTH"
                       ? "#6366F1"
                       : "#D1D5DB",
                 },
@@ -198,7 +144,6 @@ export default function TrailerController() {
             />
           </View>
 
-          {/* BUTTONS */}
           <View style={styles.row}>
             <ControlButton label="Left" icon="arrow-back" active={left} onPress={toggleLeft} />
             <ControlButton label="Right" icon="arrow-forward" active={right} onPress={toggleRight} />

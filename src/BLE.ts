@@ -1,10 +1,21 @@
 import { Buffer } from "buffer";
+import { PermissionsAndroid } from "react-native";
 import { BleManager, Characteristic, Device } from "react-native-ble-plx";
-(globalThis as any).Buffer = Buffer;
+
+(globalThis as any).Buffer = Buffer;  
 
 const SERVICE_UUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
 const RX_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"; // phone writes
 const TX_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"; // notifications
+
+
+async function requestBlePermissions() {
+  await PermissionsAndroid.requestMultiple([
+    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+    "android.permission.BLUETOOTH_SCAN",
+    "android.permission.BLUETOOTH_CONNECT",
+  ]);
+}
 
 class BLEController {
   manager = new BleManager();
@@ -25,10 +36,15 @@ class BLEController {
     this.onStatusChange?.(status);
   }
 
+
   // -----------------------------
   // ⭐ SEARCH DEVICES
   // -----------------------------
-  startScan() {
+ 
+  async startScan() {
+
+    await requestBlePermissions();
+
     this.setStatus("scanning");
 
     this.manager.startDeviceScan(null, null, (error, scannedDevice) => {
