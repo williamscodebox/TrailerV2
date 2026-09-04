@@ -1,5 +1,8 @@
+import { Buffer } from "buffer";
+
 import { useEffect, useState } from "react";
 import { BLE } from "../BLE";
+
 
 export type TrailerState =
   | "OFF"
@@ -13,15 +16,14 @@ export type TrailerState =
 
 type ConnectionStatus = "idle" | "scanning" | "connecting" | "connected" | "disconnected";
 
-function computeCommand(left: boolean, right: boolean, hazards: boolean, brake: boolean): string {
-  if (hazards) return "H";
-  if (brake) return "B";
-  if (left && right) return "H"; // hazards mimic both
-  if (left) return "L";
-  if (right) return "R";
-  return "O";
+function computeCommand(left: boolean, right: boolean, hazards: boolean, brake: boolean ): number {
+  if (hazards) return 3;
+  if (brake) return 4;
+  if (left && right) return 3;
+  if (left) return 1;
+  if (right) return 2;
+  return 0;
 }
-
 
 export function useTrailerController() {
   const [left, setLeft] = useState(false);
@@ -67,15 +69,20 @@ export function useTrailerController() {
     await BLE.connect(deviceId);
   };
 
-  const sendCurrentCommand = async (
-    nextLeft = left,
-    nextRight = right,
-    nextHazards = hazards,
-    nextBrake = brake
-  ) => {
-    const cmd = computeCommand(nextLeft, nextRight, nextHazards, nextBrake);
-    await BLE.write(cmd);
-  };
+const sendCurrentCommand = async (
+  nextLeft = left,
+  nextRight = right,
+  nextHazards = hazards,
+  nextBrake = brake
+) => {
+  const cmd = computeCommand(nextLeft, nextRight, nextHazards, nextBrake);
+
+ // Convert numeric command → base64 string
+  const base64 = Buffer.from([cmd]).toString("base64");
+
+  await BLE.write(base64);
+};
+
 
   const toggleLeft = async () => {
     const nextLeft = !left;

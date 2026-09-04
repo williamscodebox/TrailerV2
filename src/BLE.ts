@@ -2,12 +2,11 @@ import { Buffer } from "buffer";
 import { PermissionsAndroid } from "react-native";
 import { BleManager, Characteristic, Device } from "react-native-ble-plx";
 
-(globalThis as any).Buffer = Buffer;  
+(globalThis as any).Buffer = Buffer;
 
 const SERVICE_UUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
 const RX_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"; // phone writes
 const TX_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"; // notifications
-
 
 async function requestBlePermissions() {
   await PermissionsAndroid.requestMultiple([
@@ -20,14 +19,12 @@ async function requestBlePermissions() {
 class BLEController {
   manager = new BleManager();
   device: Device | null = null;
-  txChar: Characteristic | null = null;
+  rxChar: Characteristic | null = null;
 
-  // callbacks
   onStatusChange?: (status: string) => void;
   onTrailerState?: (state: string) => void;
-  onDeviceFound?: (device: Device) => void; // ⭐ NEW: search callback
+  onDeviceFound?: (device: Device) => void;
 
-  // write queue
   private queue: string[] = [];
   private writing = false;
 
@@ -36,15 +33,8 @@ class BLEController {
     this.onStatusChange?.(status);
   }
 
-
-  // -----------------------------
-  // ⭐ SEARCH DEVICES
-  // -----------------------------
- 
   async startScan() {
-
     await requestBlePermissions();
-
     this.setStatus("scanning");
 
     this.manager.startDeviceScan(null, null, (error, scannedDevice) => {
@@ -55,7 +45,6 @@ class BLEController {
       }
 
       if (scannedDevice) {
-        // send every device to UI
         this.onDeviceFound?.(scannedDevice);
       }
     });
@@ -66,9 +55,6 @@ class BLEController {
     this.setStatus("idle");
   }
 
-  // -----------------------------
-  // ⭐ CONNECT TO SELECTED DEVICE
-  // -----------------------------
   async connect(deviceId: string) {
     this.setStatus("connecting");
 
@@ -76,7 +62,6 @@ class BLEController {
       this.device = await this.manager.connectToDevice(deviceId);
       await this.device.discoverAllServicesAndCharacteristics();
       await this.setupCharacteristics();
-
       this.setStatus("connected");
     } catch (e) {
       console.log("Connect error:", e);
@@ -84,9 +69,6 @@ class BLEController {
     }
   }
 
-  // -----------------------------
-  // Setup characteristics + notifications
-  // -----------------------------
   private async setupCharacteristics() {
     if (!this.device) return;
 
@@ -96,7 +78,7 @@ class BLEController {
         const chars = await service.characteristics();
         for (const c of chars) {
           if (c.uuid === RX_UUID) {
-            this.txChar = c;
+            this.rxChar = c;
           }
 
           if (c.uuid === TX_UUID) {
@@ -122,45 +104,37 @@ class BLEController {
     }
   }
 
-  // -----------------------------
-  // Write queue
-  // -----------------------------
-async write(cmd: string) {
-  if (!this.device || !this.txChar) {
-    console.log("BLE not ready");
-    this.setStatus("disconnected");
-    return;
-  }
-
-  // Convert ONE ASCII character into base64
-  const base64 = Buffer.from(cmd[0], "ascii").toString("base64");
-
-  this.queue.push(base64);
-  this.processQueue();
-}
-
-private async processQueue() {
-  if (this.writing || !this.txChar) return;
-  this.writing = true;
-
-  try {
-    while (this.queue.length > 0) {
-      const base64 = this.queue.shift()!;
-      await this.txChar.writeWithoutResponse(base64);
-      console.log("Sent:", Buffer.from(base64, "base64").toString("ascii"));
+  async write(cmd: string) {
+    if (!this.device || !this.rxChar) {
+      console.log("BLE not ready");
+      this.setStatus("disconnected");
+      return;
     }
-  } catch (e) {
-    console.log("Write error:", e);
-    this.setStatus("disconnected");
-  } finally {
-    this.writing = false;
+
+    const base64 = Buffer.from(cmd[0], "ascii").toString("base64");
+
+    this.queue.push(base64);
+    this.processQueue();
   }
-}
 
+  private async processQueue() {
+    if (this.writing || !this.rxChar) return;
+    this.writing = true;
 
-  // -----------------------------
-  // Auto reconnect
-  // -----------------------------
+    try {
+      while (this.queue.length > 0) {
+        const base64 = this.queue.shift()!;
+        await this.rxChar.writeWithResponse(base64);
+        console.log("Sent:", Buffer.from(base64, "base64").toString("ascii"));
+      }
+    } catch (e) {
+      console.log("Write error:", e);
+      this.setStatus("disconnected");
+    } finally {
+      this.writing = false;
+    }
+  }
+
   async autoReconnect() {
     try {
       const connected = await this.manager.connectedDevices([SERVICE_UUID]);
@@ -177,9 +151,6 @@ private async processQueue() {
     return false;
   }
 
-  // -----------------------------
-  // Disconnect
-  // -----------------------------
   async disconnect() {
     if (!this.device) return;
 
@@ -190,7 +161,7 @@ private async processQueue() {
     }
 
     this.device = null;
-    this.txChar = null;
+    this.rxChar = null;
     this.queue = [];
     this.writing = false;
 
