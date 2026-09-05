@@ -4,9 +4,14 @@ import { BleManager, Characteristic, Device } from "react-native-ble-plx";
 
 (globalThis as any).Buffer = Buffer;
 
-const SERVICE_UUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
-const RX_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"; // phone writes
-const TX_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"; // notifications
+
+const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const RX_UUID      = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // phone writes
+const TX_UUID      = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";  // notifications
+
+// const SERVICE_UUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
+// const RX_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"; // phone writes
+// const TX_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"; // notifications
 
 async function requestBlePermissions() {
   await PermissionsAndroid.requestMultiple([
@@ -71,12 +76,14 @@ class BLEController {
 
   private async setupCharacteristics() {
     if (!this.device) return;
+    
 
     const services = await this.device.services();
     for (const service of services) {
       if (service.uuid === SERVICE_UUID) {
         const chars = await service.characteristics();
         for (const c of chars) {
+          console.log("CHAR:", c.uuid);
           if (c.uuid === RX_UUID) {
             this.rxChar = c;
           }
@@ -87,6 +94,9 @@ class BLEController {
                 console.log("Monitor error:", error);
                 return;
               }
+console.log("SERVICE:", service.uuid);
+
+console.log("CHAR:", c.uuid);
 
               const value = characteristic?.value;
               if (!value) return;
@@ -111,7 +121,8 @@ class BLEController {
       return;
     }
 
-    const base64 = Buffer.from(cmd[0], "ascii").toString("base64");
+    const base64 = Buffer.from(cmd, "ascii").toString("base64");
+
 
     this.queue.push(base64);
     this.processQueue();
@@ -124,7 +135,8 @@ class BLEController {
     try {
       while (this.queue.length > 0) {
         const base64 = this.queue.shift()!;
-        await this.rxChar.writeWithResponse(base64);
+        await this.rxChar.writeWithoutResponse(base64);
+
         console.log("Sent:", Buffer.from(base64, "base64").toString("ascii"));
       }
     } catch (e) {
