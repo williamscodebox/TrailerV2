@@ -4,14 +4,13 @@ import { BleManager, Characteristic, Device } from "react-native-ble-plx";
 
 (globalThis as any).Buffer = Buffer;
 
+// const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const SERVICE_UUID = "9ecadc24-0ee5-a9e0-93f3-a3b50100406e";
+// const SERVICE_UUID = "9ecadc24-0ee5-a9e0-93f3-a3b50100406e";
 
-const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const RX_UUID      = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // phone writes
-const TX_UUID      = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";  // notifications
+const TX_UUID = "9ecadc24-0ee5-a9e0-93f3-a3b50300406e"; // notify
+const RX_UUID = "9ecadc24-0ee5-a9e0-93f3-a3b50200406e"; // write
 
-// const SERVICE_UUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
-// const RX_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"; // phone writes
-// const TX_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"; // notifications
 
 async function requestBlePermissions() {
   await PermissionsAndroid.requestMultiple([
@@ -76,33 +75,37 @@ class BLEController {
 
   private async setupCharacteristics() {
     if (!this.device) return;
-    
 
     const services = await this.device.services();
+     console.log("SERVICES:");
+
+     services.forEach(s => console.log("  ", s.uuid));
     for (const service of services) {
-      if (service.uuid === SERVICE_UUID) {
+      if (service.uuid.toLowerCase() === SERVICE_UUID.toLowerCase()) {
         const chars = await service.characteristics();
         for (const c of chars) {
           console.log("CHAR:", c.uuid);
-          if (c.uuid === RX_UUID) {
+          console.log("CHAR PROPERTIES:", c.isWritableWithoutResponse, c.isNotifiable);
+
+
+          if (c.uuid.toLowerCase() === RX_UUID.toLowerCase()) {
             this.rxChar = c;
+            console.log("RX characteristic bound");
           }
 
-          if (c.uuid === TX_UUID) {
+          if (c.uuid.toLowerCase() === TX_UUID.toLowerCase()) {
             c.monitor((error, characteristic) => {
               if (error) {
                 console.log("Monitor error:", error);
                 return;
               }
-console.log("SERVICE:", service.uuid);
-
-console.log("CHAR:", c.uuid);
 
               const value = characteristic?.value;
               if (!value) return;
 
               try {
                 const decoded = Buffer.from(value, "base64").toString("utf8");
+                console.log("NOTIFY:", decoded);
                 this.onTrailerState?.(decoded);
               } catch (e) {
                 console.log("Decode error:", e);
@@ -112,17 +115,20 @@ console.log("CHAR:", c.uuid);
         }
       }
     }
+
+    if (!this.rxChar) {
+      console.log("RX characteristic NOT FOUND");
+    }
   }
 
-  async write(cmd: string) {
+  async write(cmd: number) {
     if (!this.device || !this.rxChar) {
-      console.log("BLE not ready");
-      this.setStatus("disconnected");
+      console.log("BLE not ready (no RX characteristic yet)");
       return;
     }
 
-    const base64 = Buffer.from(cmd, "ascii").toString("base64");
-
+    const buf = Buffer.from([cmd]);
+    const base64 = buf.toString("base64");
 
     this.queue.push(base64);
     this.processQueue();
@@ -137,7 +143,8 @@ console.log("CHAR:", c.uuid);
         const base64 = this.queue.shift()!;
         await this.rxChar.writeWithoutResponse(base64);
 
-        console.log("Sent:", Buffer.from(base64, "base64").toString("ascii"));
+        const sent = Buffer.from(base64, "base64")[0];
+        console.log("Sent CMD:", sent);
       }
     } catch (e) {
       console.log("Write error:", e);

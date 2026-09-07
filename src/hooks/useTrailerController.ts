@@ -1,4 +1,3 @@
-import { Buffer } from "buffer";
 
 import { useEffect, useState } from "react";
 import { BLE } from "../BLE";
@@ -78,9 +77,8 @@ const sendCurrentCommand = async (
   const cmd = computeCommand(nextLeft, nextRight, nextHazards, nextBrake);
 
  // Convert numeric command → base64 string
-  const base64 = Buffer.from([cmd]).toString("base64");
+  await BLE.write(cmd);
 
-  await BLE.write(base64);
 };
 
 
