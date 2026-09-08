@@ -42,21 +42,19 @@ export default function TrailerController() {
     blinkRight.value = withRepeat(withTiming(0, { duration: 300 }), -1, true);
   }, []);
 
-  // LEFT blink logic
+  // LEFT blink logic (no BOTH)
   const leftBlinkStyle = useAnimatedStyle(() => {
     const shouldBlink =
       trailerState === "LEFT" ||
-      trailerState === "BOTH" ||
       trailerState === "HAZARDS";
 
     return { opacity: shouldBlink ? blinkLeft.value : 1 };
   });
 
-  // RIGHT blink logic
+  // RIGHT blink logic (no BOTH)
   const rightBlinkStyle = useAnimatedStyle(() => {
     const shouldBlink =
       trailerState === "RIGHT" ||
-      trailerState === "BOTH" ||
       trailerState === "HAZARDS";
 
     return { opacity: shouldBlink ? blinkRight.value : 1 };
@@ -68,14 +66,26 @@ export default function TrailerController() {
     const isRight = side === "right";
 
     switch (state) {
-      case "HAZARDS": return "#FACC15";
-      case "BRAKE": return "#EF4444";
-      case "BRAKE_LEFT": return isLeft ? "#EF4444" : "#D1D5DB";
-      case "BRAKE_RIGHT": return isRight ? "#EF4444" : "#D1D5DB";
-      case "LEFT": return isLeft ? "#6366F1" : "#D1D5DB";
-      case "RIGHT": return isRight ? "#6366F1" : "#D1D5DB";
-      case "BOTH": return "#6366F1";
-      default: return "#D1D5DB";
+      case "HAZARDS":
+        return "#FACC15";
+
+      case "BRAKE":
+        return "#EF4444";
+
+      case "BRAKE_LEFT":
+        return isLeft ? "#EF4444" : "#D1D5DB";
+
+      case "BRAKE_RIGHT":
+        return isRight ? "#EF4444" : "#D1D5DB";
+
+      case "LEFT":
+        return isLeft ? "#6366F1" : "#D1D5DB";
+
+      case "RIGHT":
+        return isRight ? "#6366F1" : "#D1D5DB";
+
+      default:
+        return "#D1D5DB"; // OFF
     }
   }, []);
 
@@ -146,10 +156,12 @@ export default function TrailerController() {
             <ControlButton label="Left" icon="arrow-back" active={left} onPress={toggleLeft} />
             <ControlButton label="Right" icon="arrow-forward" active={right} onPress={toggleRight} />
           </View>
+
           <View style={styles.row}>
-          <ControlButton label="Hazards" icon="warning" active={hazards} onPress={toggleHazards} />
-          <ControlButton label="Brake" icon="stop" active={brake} onPress={toggleBrake} />
+            <ControlButton label="Hazards" icon="warning" active={hazards} onPress={toggleHazards} />
+            <ControlButton label="Brake" icon="stop" active={brake} onPress={toggleBrake} />
           </View>
+
           <Text style={styles.status}>{trailerState}</Text>
         </>
       )}
