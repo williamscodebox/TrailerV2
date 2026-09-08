@@ -54,7 +54,8 @@ const styles = StyleSheet.create({
   container: {
     maxWidth: MaxContentWidth,
     flexGrow: 1,
-    padding: 10
+    marginTop: 40,
+    padding: 20
   },
   titleContainer: {
     gap: Spacing.three,

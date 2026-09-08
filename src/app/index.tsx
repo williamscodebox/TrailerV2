@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -33,59 +33,65 @@ export default function TrailerController() {
     toggleBrake,
   } = useTrailerController();
 
-  const blink = useSharedValue(1);
+  // Independent blink values
+  const blinkLeft = useSharedValue(1);
+  const blinkRight = useSharedValue(1);
 
-  // Run blink animation once, forever
   useEffect(() => {
-    blink.value = withRepeat(withTiming(0, { duration: 300 }), -1, true);
+    blinkLeft.value = withRepeat(withTiming(0, { duration: 300 }), -1, true);
+    blinkRight.value = withRepeat(withTiming(0, { duration: 300 }), -1, true);
   }, []);
 
-  const blinkStyle = useAnimatedStyle(() => {
+  // LEFT blink logic
+  const leftBlinkStyle = useAnimatedStyle(() => {
     const shouldBlink =
       trailerState === "LEFT" ||
+      trailerState === "BOTH" ||
+      trailerState === "HAZARDS";
+
+    return { opacity: shouldBlink ? blinkLeft.value : 1 };
+  });
+
+  // RIGHT blink logic
+  const rightBlinkStyle = useAnimatedStyle(() => {
+    const shouldBlink =
       trailerState === "RIGHT" ||
       trailerState === "BOTH" ||
       trailerState === "HAZARDS";
 
-    return {
-      opacity: shouldBlink ? blink.value : 1,
-    };
+    return { opacity: shouldBlink ? blinkRight.value : 1 };
   });
 
-  function getLightColor(side: "left" | "right", state: string) {
+  // Clean + memoized color logic
+  const getLightColor = useCallback((side: "left" | "right", state: string) => {
     const isLeft = side === "left";
     const isRight = side === "right";
 
-    if (state === "HAZARDS") return "#FACC15";
-    if (state === "BRAKE") return "#EF4444";
-    if (state === "BRAKE_LEFT" && isLeft) return "#EF4444";
-    if (state === "BRAKE_RIGHT" && isRight) return "#EF4444";
-    if (state === "LEFT" && isLeft) return "#6366F1";
-    if (state === "RIGHT" && isRight) return "#6366F1";
-    if (state === "BOTH") return "#6366F1";
+    switch (state) {
+      case "HAZARDS": return "#FACC15";
+      case "BRAKE": return "#EF4444";
+      case "BRAKE_LEFT": return isLeft ? "#EF4444" : "#D1D5DB";
+      case "BRAKE_RIGHT": return isRight ? "#EF4444" : "#D1D5DB";
+      case "LEFT": return isLeft ? "#6366F1" : "#D1D5DB";
+      case "RIGHT": return isRight ? "#6366F1" : "#D1D5DB";
+      case "BOTH": return "#6366F1";
+      default: return "#D1D5DB";
+    }
+  }, []);
 
-    return "#D1D5DB";
-  }
+  const statusColor = {
+    connected: "#22C55E",
+    connecting: "#FACC15",
+    scanning: "#3B82F6",
+    idle: "#EF4444",
+    disconnected: "#EF4444",
+  }[connectionStatus];
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Trailer Controller</Text>
 
-      <View
-        style={[
-          styles.statusBar,
-          {
-            backgroundColor:
-              connectionStatus === "connected"
-                ? "#22C55E"
-                : connectionStatus === "connecting"
-                ? "#FACC15"
-                : connectionStatus === "scanning"
-                ? "#3B82F6"
-                : "#EF4444",
-          },
-        ]}
-      >
+      <View style={[styles.statusBar, { backgroundColor: statusColor }]}>
         <Text style={styles.statusBarText}>
           {connectionStatus === "connected" && "Connected"}
           {connectionStatus === "connecting" && "Connecting…"}
@@ -122,7 +128,7 @@ export default function TrailerController() {
             <Animated.View
               style={[
                 styles.light,
-                blinkStyle,
+                leftBlinkStyle,
                 { backgroundColor: getLightColor("left", trailerState) },
               ]}
             />
@@ -130,7 +136,7 @@ export default function TrailerController() {
             <Animated.View
               style={[
                 styles.light,
-                blinkStyle,
+                rightBlinkStyle,
                 { backgroundColor: getLightColor("right", trailerState) },
               ]}
             />
@@ -140,10 +146,10 @@ export default function TrailerController() {
             <ControlButton label="Left" icon="arrow-back" active={left} onPress={toggleLeft} />
             <ControlButton label="Right" icon="arrow-forward" active={right} onPress={toggleRight} />
           </View>
-
+          <View style={styles.row}>
           <ControlButton label="Hazards" icon="warning" active={hazards} onPress={toggleHazards} />
           <ControlButton label="Brake" icon="stop" active={brake} onPress={toggleBrake} />
-
+          </View>
           <Text style={styles.status}>{trailerState}</Text>
         </>
       )}
